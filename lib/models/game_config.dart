@@ -55,15 +55,7 @@ abstract final class GameConfig {
   static const int interstitialEveryNDeaths = 3;
   static const int minAchievementCoins = 10;
 
-  static const List<int> dailyRewardSchedule = <int>[
-    10,
-    15,
-    20,
-    25,
-    30,
-    40,
-    75
-  ];
+  static const List<int> dailyRewardSchedule = <int>[10, 15, 20, 25, 30, 40, 75];
   static const int dailyRewardCooldownHours = 20;
   static const int dailyRewardStreakResetDays = 2;
 
