@@ -87,4 +87,13 @@ final class OrbiaGame extends FlameGame with TapCallbacks {
   void restartGame() {
     _world.startGame();
   }
+
+  void handleTap() {
+    final GamePhase phase = ref.read(gameStateProvider).phase;
+    if (phase != GamePhase.playing && phase != GamePhase.dashing) {
+      return;
+    }
+    AudioService.instance.playTap();
+    _world.onTap();
+  }
 }

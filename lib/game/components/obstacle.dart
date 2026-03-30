@@ -37,7 +37,6 @@ final class Obstacle extends PositionComponent implements Poolable {
   ObstacleEyeColor eyeColor = ObstacleEyeColor.cyan;
 
   Offset _center = Offset.zero;
-
   final Paint _haloLarge = Paint()
     ..style = PaintingStyle.fill
     ..color = const Color(0x771A1A2E)

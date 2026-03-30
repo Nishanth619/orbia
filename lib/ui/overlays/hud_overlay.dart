@@ -16,11 +16,10 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
     with SingleTickerProviderStateMixin {
   static const int _levelTarget = 3000;
 
-  // Level-up toast animation
   late final AnimationController _toastCtrl;
-  late final Animation<double> _toastAnim;
-  String _toastText = '';
-  bool _showingToast = false;
+  late final Animation<double>   _toastAnim;
+  String _toastText    = '';
+  bool   _showingToast = false;
 
   @override
   void initState() {
@@ -32,7 +31,7 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
     _toastAnim = CurvedAnimation(parent: _toastCtrl, curve: Curves.easeOut);
     _toastCtrl.addStatusListener((AnimationStatus status) {
       if (status == AnimationStatus.completed) {
-        setState(() => _showingToast = false);
+        if (mounted) setState(() => _showingToast = false);
       }
     });
   }
@@ -44,20 +43,16 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
   }
 
   void _triggerLevelUpToast(int level) {
-    setState(() {
-      _toastText = 'LEVEL $level';
-      _showingToast = true;
-    });
+    setState(() { _toastText = 'LEVEL $level'; _showingToast = true; });
     _toastCtrl.forward(from: 0.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final GameSessionState gameState = ref.watch(gameStateProvider);
-    final int coins = ref.watch(economyProvider
-        .select((e) => e.coinBalance));
+    final int coins = ref.watch(
+        economyProvider.select((e) => e.coinBalance));
 
-    // React to level-up event.
     ref.listen<GameSessionState>(gameStateProvider, (prev, next) {
       if (next.justLeveledUp && next.level > (prev?.level ?? 1)) {
         _triggerLevelUpToast(next.level);
@@ -67,12 +62,15 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
     return SafeArea(
       child: Stack(
         children: <Widget>[
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+
+                // ── Left: LEVEL + dots + lives ──────────────────────
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -91,7 +89,7 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
                           fontWeight: FontWeight.w700,
                         )),
                     const SizedBox(height: 4),
-                    // Progress dots within current level
+                    // Progress dots
                     Row(children: List<Widget>.generate(5, (int i) {
                       final int prog = gameState.score % GameConfig.nodesPerLevel;
                       final bool filled = i < (prog * 5 ~/ GameConfig.nodesPerLevel);
@@ -100,38 +98,37 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
                         child: _Dot(filled: filled),
                       );
                     })),
+                    const SizedBox(height: 8),
+                    // Lives (heart icons)
+                    _LivesRow(lives: gameState.lives),
                     // Shield indicator
                     if (gameState.shieldActive) ...<Widget>[
-                      const SizedBox(height: 8),
-                      _ShieldIcon(),
+                      const SizedBox(height: 6),
+                      const _ShieldIcon(),
                     ],
                   ],
                 ),
 
-                // Right: CRYSTALS + Level badge
+                // ── Right: Level badge + CRYSTALS ───────────────────
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    // Level badge
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: Colors.white30, width: 1),
+                        border: Border.all(color: Colors.white30, width: 1),
                       ),
-                      child: Text(
-                        'LVL ${gameState.level}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
-                      ),
+                      child: Text('LVL ${gameState.level}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          )),
                     ),
                     const SizedBox(height: 4),
                     const Text('CRYSTALS',
@@ -146,8 +143,8 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
                       children: <Widget>[
                         Transform.rotate(
                           angle: 0.785,
-                          child: Container(width: 10, height: 10,
-                              color: Colors.white),
+                          child: Container(
+                              width: 10, height: 10, color: Colors.white),
                         ),
                         const SizedBox(width: 6),
                         Text('$coins',
@@ -160,11 +157,12 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
                     ),
                   ],
                 ),
+
               ],
             ),
           ),
 
-          // LEVEL UP! toast (centred)
+          // ── LEVEL UP toast ───────────────────────────────────────
           if (_showingToast)
             Positioned.fill(
               child: IgnorePointer(
@@ -172,42 +170,38 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
                   child: AnimatedBuilder(
                     animation: _toastAnim,
                     builder: (_, __) {
-                      // Fade in 0→0.3, hold 0.3→0.7, fade out 0.7→1.0
                       final double t = _toastAnim.value;
                       double opacity;
-                      if (t < 0.25)       opacity = t / 0.25;
-                      else if (t < 0.70)  opacity = 1.0;
-                      else                opacity = 1.0 - (t - 0.70) / 0.30;
+                      if (t < 0.25) {
+                        opacity = t / 0.25;
+                      } else if (t < 0.70) {
+                        opacity = 1.0;
+                      } else {
+                        opacity = 1.0 - (t - 0.70) / 0.30;
+                      }
 
                       return Opacity(
                         opacity: opacity.clamp(0.0, 1.0),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            const Text(
-                              'LEVEL UP!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                letterSpacing: 5,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                            Text(
-                              _toastText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 52,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 4,
-                                shadows: <Shadow>[
-                                  Shadow(
-                                    color: Colors.white,
-                                    blurRadius: 24,
-                                  ),
-                                ],
-                              ),
-                            ),
+                            const Text('LEVEL UP!',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  letterSpacing: 5,
+                                  fontWeight: FontWeight.w400,
+                                )),
+                            Text(_toastText,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 52,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 4,
+                                  shadows: <Shadow>[
+                                    Shadow(color: Colors.white, blurRadius: 24),
+                                  ],
+                                )),
                           ],
                         ),
                       );
@@ -222,6 +216,40 @@ class _HudOverlayState extends ConsumerState<HudOverlay>
     );
   }
 }
+
+// ── Lives row ─────────────────────────────────────────────────────────────────
+
+class _LivesRow extends StatelessWidget {
+  const _LivesRow({required this.lives});
+  final int lives;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List<Widget>.generate(GameConfig.startingLives, (int i) {
+        final bool filled = i < lives;
+        return Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Icon(
+            filled ? Icons.favorite : Icons.favorite_border,
+            color: filled
+                ? const Color(0xFFFF4466)
+                : Colors.white24,
+            size: 14,
+            shadows: filled
+                ? const <Shadow>[
+                    Shadow(color: Color(0xFFFF4466), blurRadius: 6),
+                  ]
+                : null,
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ── Helper widgets ────────────────────────────────────────────────────────────
 
 class _Dot extends StatelessWidget {
   const _Dot({required this.filled});
@@ -243,18 +271,18 @@ class _ShieldIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 28, height: 28,
+        width: 26, height: 26,
         decoration: BoxDecoration(
-          color: const Color(0xFF00CFFF).withOpacity(0.2),
+          color: const Color(0xFF00CFFF).withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: const Color(0xFF00CFFF), width: 1.5),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: const Color(0xFF00CFFF).withOpacity(0.4),
+              color: const Color(0xFF00CFFF).withValues(alpha: 0.4),
               blurRadius: 8,
             ),
           ],
         ),
-        child: const Icon(Icons.shield, size: 16, color: Color(0xFF00CFFF)),
+        child: const Icon(Icons.shield, size: 14, color: Color(0xFF00CFFF)),
       );
 }

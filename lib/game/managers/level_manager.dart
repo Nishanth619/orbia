@@ -16,12 +16,12 @@ final class ObstacleConfig {
     required this.eyeColor,
   });
 
-  final double centerX;
-  final double centerY;
-  final double omega;
-  final double phi;
-  final double radius;
-  final double orbitRadius;
+  final double           centerX;
+  final double           centerY;
+  final double           omega;
+  final double           phi;
+  final double           radius;
+  final double           orbitRadius;
   final ObstacleEyeColor eyeColor;
 }
 
@@ -32,30 +32,41 @@ final class NodeData {
     this.spawnShield = false,
   });
 
-  final Vector2 worldPosition;
+  final Vector2              worldPosition;
   final List<ObstacleConfig> obstacles;
-  final bool spawnShield;
+  final bool                 spawnShield;
 }
 
+/// Generates node positions and obstacle configurations.
+///
+/// PLAYABILITY GUARANTEE:
+///   - Max 5 obstacles per node (hard cap)
+///   - Orbit radius grows with count so gaps are always >= 48wu
+///   - Max ω = 3.0 rad/s (was 5.5 — impossible timing)
+///   - Obstacle sizes: small/medium/large but capped smaller
+///   - ω ramp: +0.025 per node (was 0.04 — too fast)
 final class LevelManager {
   LevelManager({required this.screenSize}) {
     _rng = math.Random();
   }
 
-  final Vector2 screenSize;
+  final Vector2      screenSize;
   late final math.Random _rng;
 
-  int _nodesGenerated = 0;
-  int _nodesReached = 0;
-  double _lastX = 0.0;
-  double _lastY = 0.0;
-  int _zigDir = 1;
+  int    _nodesGenerated = 0;
+  int    _nodesReached   = 0;
+
+  double _lastX  = 0.0;
+  double _lastY  = 0.0;
+  int    _zigDir = 1;
+
+  // ── Public API ────────────────────────────────────────────────────────
 
   void reset(Vector2 startPosition) {
     _nodesGenerated = 0;
-    _nodesReached = 0;
-    _lastX = startPosition.x;
-    _lastY = startPosition.y;
+    _nodesReached   = 0;
+    _lastX  = startPosition.x;
+    _lastY  = startPosition.y;
     _zigDir = 1;
   }
 
@@ -65,10 +76,11 @@ final class LevelManager {
   int get currentLevel => (_nodesReached ~/ GameConfig.nodesPerLevel) + 1;
 
   NodeData generateNext() {
-    final Vector2 pos = _nextNodePosition();
+    final Vector2              pos       = _nextNodePosition();
     final List<ObstacleConfig> obstacles = _buildObstacles(pos);
 
-    final bool spawnShield = _nodesGenerated > 0 &&
+    final bool spawnShield =
+        _nodesGenerated > 0 &&
         _nodesGenerated % GameConfig.shieldSpawnEveryNNodes == 0;
 
     _lastX = pos.x;
@@ -77,58 +89,59 @@ final class LevelManager {
 
     return NodeData(
       worldPosition: pos,
-      obstacles: obstacles,
-      spawnShield: spawnShield,
+      obstacles:     obstacles,
+      spawnShield:   spawnShield,
     );
   }
+
+  // ── Node positioning ──────────────────────────────────────────────────
 
   Vector2 _nextNodePosition() {
     if (_nodesGenerated == 0) {
       return Vector2(screenSize.x / 2, screenSize.y * 0.70);
     }
-
-    final double newY = _lastY + GameConfig.nodeVerticalStep;
+    final double newY     = _lastY + GameConfig.nodeVerticalStep;
     final double baseStep = GameConfig.nodeMaxHorizontalOffset * _zigDir;
-    final double jitter =
+    final double jitter   =
         (_rng.nextDouble() - 0.5) * GameConfig.nodeMaxHorizontalOffset * 0.3;
     double newX = _lastX + baseStep + jitter;
-
     const double margin = 70.0;
     newX = newX.clamp(margin, screenSize.x - margin);
-
     if (_rng.nextDouble() > 0.20) _zigDir = -_zigDir;
     return Vector2(newX, newY);
   }
 
+  // ── Obstacle generation — PLAYABILITY GUARANTEED ─────────────────────
+
   List<ObstacleConfig> _buildObstacles(Vector2 nodePos) {
     if (_nodesGenerated == 0) return <ObstacleConfig>[];
 
-    final int count = _obstacleCount();
-    final double omega = _scaledOmega();
+    final int    count     = _obstacleCount();
+    final double omega     = _scaledOmega();
     final double direction = _nodesGenerated.isEven ? 1.0 : -1.0;
 
+    // All obstacles orbit the EXACT node position.
     final double cx = nodePos.x;
     final double cy = nodePos.y;
 
-    final double phaseStep = (math.pi * 2.0) / count;
+    // Orbit radius grows with count — guarantees minimum gap.
+    final double orbitR = GameConfig.orbitRadiusByCount[
+        count.clamp(0, GameConfig.orbitRadiusByCount.length - 1)];
+
+    final double phaseStep   = (math.pi * 2.0) / count;
     final double phaseOffset = _rng.nextDouble() * math.pi * 2.0;
 
     return List<ObstacleConfig>.generate(count, (int i) {
       final double radius = _randomRadius();
-      final double orbitR = GameConfig.obstacleOrbitRadiusBase +
-          (radius - GameConfig.obstacleRadiusMedium) * 0.8;
-
-      final ObstacleEyeColor eyes =
-          i.isEven ? ObstacleEyeColor.cyan : ObstacleEyeColor.green;
 
       return ObstacleConfig(
-        centerX: cx,
-        centerY: cy,
-        omega: omega * direction,
-        phi: phaseOffset + phaseStep * i,
-        radius: radius,
+        centerX:     cx,
+        centerY:     cy,
+        omega:       omega * direction,
+        phi:         phaseOffset + phaseStep * i,
+        radius:      radius,
         orbitRadius: orbitR,
-        eyeColor: eyes,
+        eyeColor:    i.isEven ? ObstacleEyeColor.cyan : ObstacleEyeColor.green,
       );
     }, growable: false);
   }
@@ -140,17 +153,19 @@ final class LevelManager {
     return GameConfig.obstacleRadiusLarge;
   }
 
+  /// Obstacle count capped at 5 — mathematically guarantees playability.
   int _obstacleCount() {
     if (_nodesReached == 0) return 2;
-    if (_nodesReached < 5) return 3;
-    if (_nodesReached < 10) return 4;
-    if (_nodesReached < 15) return 5;
-    if (_nodesReached < 20) return 6;
-    return 7;
+    if (_nodesReached < 5)  return 2;
+    if (_nodesReached < 12) return 3;
+    if (_nodesReached < 22) return 4;
+    return 5; // hard cap — never more than 5
   }
 
+  /// ω increases slowly, hard-capped at 3.0 rad/s.
   double _scaledOmega() {
-    final double ramp = GameConfig.obstacleBaseOmega +
+    final double ramp =
+        GameConfig.obstacleBaseOmega +
         _nodesReached * GameConfig.omegaPerNodeIncrement;
     return math.min(ramp, GameConfig.maxOmega);
   }
